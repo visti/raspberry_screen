@@ -25,6 +25,17 @@ import sentence_display
 import romanian_display
 import refresh_display
 
+def _safe_fallback():
+    """Return a guaranteed-available prepared tuple (never triggers a network call)."""
+    try:
+        return word_of_the_day.get_word.__module__ and word_of_the_day._random_fallback()
+    except Exception:
+        return (
+            ["Sommerfugl", "En sommerfugl flyver over blomsten."],
+            ["Butterfly",  "A butterfly flies over the flower."],
+            ["Fluture",    "Un fluture zboară peste floare."],
+        )
+
 # buttonshim names the leftmost button E and rightmost A because the PCB was
 # designed for the opposite orientation.  Remap so our code uses intuitive
 # left-to-right A→E order.
@@ -66,7 +77,8 @@ def _run(fn, led_rgb, prepare=None):
             prep_thread.start()
             clear_display.flash()
             prep_thread.join(timeout=_PREPARE_TIMEOUT)
-            fn(prep_result[0])
+            # If prepare timed out, use a local fallback — never re-trigger a network call
+            fn(prep_result[0] if prep_result[0] is not None else _safe_fallback())
         else:
             clear_display.flash()
             fn()

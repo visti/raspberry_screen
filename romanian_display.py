@@ -2,10 +2,8 @@
 
 import word_of_the_day
 from PIL import ImageDraw
-from layout import get_inky, make_canvas, save_preview
+from layout import BLACK, RED, get_inky, make_canvas, save_preview
 from sentence_display import draw_split
-
-RED, BLACK = 2, 0
 
 
 def prepare():

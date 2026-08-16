@@ -1,0 +1,14 @@
+[Unit]
+Description=Inky display button daemon
+After=network.target
+
+[Service]
+Environment=GEMINI_API_KEY=YOUR_KEY_HERE
+ExecStart=/home/visti/inky-env/bin/python /home/visti/daemon.py
+WorkingDirectory=/home/visti
+Restart=on-failure
+RestartSec=5
+User=visti
+
+[Install]
+WantedBy=multi-user.target

@@ -159,6 +159,7 @@ def main():
             w for w in batch
             if w["danish_word"].lower() not in already_words
         ]
+        new = new[:want - added]   # never overshoot the requested count
         entries.extend(new)
         added += len(new)
         _save(entries)

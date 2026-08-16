@@ -163,7 +163,18 @@ def get_word():
     try:
         word = _fetch_from_api()
     except Exception:
-        return _random_fallback()
+        # Cache the fallback so A, B, C all show the same word today
+        fallback = _random_fallback()
+        try:
+            cache[today] = {
+                "danish_word":      fallback[0][0], "danish_sentence":  fallback[0][1],
+                "english_word":     fallback[1][0], "english_sentence": fallback[1][1],
+                "romanian_word":    fallback[2][0], "romanian_sentence":fallback[2][1],
+            }
+            _save_cache(cache)
+        except Exception:
+            pass
+        return fallback
 
     try:
         cache[today] = word

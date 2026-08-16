@@ -25,24 +25,21 @@ source inky-env/bin/activate
 pip install pillow httpx inky[rpi] buttonshim
 ```
 
-Copy `daemon.py` and friends to `~/` on the Pi, then install the systemd service:
+Copy all files to `~/` on the Pi, then install the systemd units:
 
 ```bash
-sudo cp inky.service /etc/systemd/system/
+# Edit GEMINI_API_KEY in both service files first
+sudo cp systemd/inky.service systemd/inky-daily.service systemd/inky-daily.timer \
+     /etc/systemd/system/
+sudo systemctl daemon-reload
 sudo systemctl enable --now inky
+sudo systemctl enable --now inky-daily.timer
 ```
-
-Set `GEMINI_API_KEY` in the service file (see `inky.service`).
 
 ## Daily refresh
 
-A systemd timer (`inky-daily.timer`) runs at 06:00 every day to pre-fetch a new
-word and grow the fallback pool:
-
-```bash
-sudo cp inky-daily.service inky-daily.timer /etc/systemd/system/
-sudo systemctl enable --now inky-daily.timer
-```
+`inky-daily.timer` fires at 06:00 every day: clears the word cache, pre-fetches
+a new word, and adds 20 entries to the fallback pool.
 
 ## Fallback pool
 

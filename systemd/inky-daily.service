@@ -1,0 +1,14 @@
+[Unit]
+Description=Inky daily word refresh
+After=network.target
+
+[Service]
+Environment=GEMINI_API_KEY=YOUR_KEY_HERE
+ExecStart=/home/visti/inky-env/bin/python /home/visti/daily_refresh.py
+WorkingDirectory=/home/visti
+User=visti
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
