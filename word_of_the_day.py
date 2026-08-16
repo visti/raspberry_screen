@@ -66,7 +66,8 @@ def _random_fallback(avoid_words: list[str] | None = None):
                 filtered = [e for e in pool
                             if e["danish_word"].lower() not in lower_avoid]
                 pool = filtered or pool  # never return nothing
-            entry = random.choice(pool)
+            weights = [0.2 if e.get("vulgar") else 1.0 for e in pool]
+            entry = random.choices(pool, weights=weights, k=1)[0]
             return (
                 [entry["danish_word"],   entry["danish_sentence"]],
                 [entry["english_word"],  entry["english_sentence"]],
