@@ -75,16 +75,19 @@ def _save_cache(data: dict) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def clear_today() -> None:
-    """Remove today's cache entry so the next get_word() fetches a fresh word."""
+def clear_today() -> str | None:
+    """Remove today's cache entry. Returns the cleared Danish word (or None)."""
     today = date.today().isoformat()
     cache = _load_cache()
     if today in cache:
+        word = cache[today].get("danish_word")
         del cache[today]
         try:
             _save_cache(cache)
         except Exception:
             pass
+        return word
+    return None
 
 
 _MODELS = [
@@ -95,8 +98,12 @@ _MAX_RETRIES = 3
 _RETRY_DELAY = 4   # seconds between retries
 
 
-def _fetch_from_api() -> dict:
+def _fetch_from_api(avoid_word: str | None = None) -> dict:
     api_key = os.environ["GEMINI_API_KEY"]
+    avoid_clause = (
+        f" Do NOT pick '{avoid_word}' — choose a different word entirely."
+        if avoid_word else ""
+    )
     payload = {
         "contents": [
             {
@@ -106,10 +113,12 @@ def _fetch_from_api() -> dict:
                             "Pick a Danish word of the day for a language learner. "
                             "Choose a common, practical Danish word — the kind that "
                             "appears frequently in everyday speech and writing "
-                            "(e.g. verbs like 'fortælle', 'betyde', adjectives like "
-                            "'rolig', 'glad', nouns like 'mulighed', 'forskel'). "
-                            "Avoid rare, archaic, or highly specialised words. "
-                            "Provide the Danish word and a natural Danish example "
+                            "(e.g. verbs like 'fortælle', 'betyde', 'hjælpe', "
+                            "adjectives like 'rolig', 'glad', 'travl', "
+                            "nouns like 'forskel', 'sted', 'tid'). "
+                            "Avoid rare, archaic, or highly specialised words."
+                            + avoid_clause +
+                            " Provide the Danish word and a natural Danish example "
                             "sentence, its English translation with a natural English "
                             "example sentence, and its Romanian translation with a "
                             "natural Romanian example sentence."
@@ -145,9 +154,12 @@ def _fetch_from_api() -> dict:
     raise RuntimeError(f"All models failed after {_MAX_RETRIES} attempts each")
 
 
-def get_word():
+def get_word(avoid_word: str | None = None):
     """Return ([danish_word, danish_sentence], [english_word, english_sentence],
-               [romanian_word, romanian_sentence])."""
+               [romanian_word, romanian_sentence]).
+
+    avoid_word: hint to the API to pick something other than this Danish word.
+    """
     today = date.today().isoformat()
     cache = _load_cache()
 
@@ -161,7 +173,7 @@ def get_word():
         )
 
     try:
-        word = _fetch_from_api()
+        word = _fetch_from_api(avoid_word=avoid_word)
     except Exception:
         # Cache the fallback so A, B, C all show the same word today
         fallback = _random_fallback()

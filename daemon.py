@@ -124,9 +124,9 @@ def _run_refresh():
         buttonshim.set_pixel(255, 0, 255)
         # Push interstitial right away — gives user feedback during panel refresh
         refresh_display.show()
-        # Clear cache and fetch new word concurrently with second panel cycle
-        word_of_the_day.clear_today()
-        prepared = word_display.prepare()
+        # Clear cache; pass the old word so the API picks something different
+        old_word = word_of_the_day.clear_today()
+        prepared = word_of_the_day.get_word(avoid_word=old_word)
         word_display.show(prepared)
         print("Done refresh", flush=True)
     except Exception:
