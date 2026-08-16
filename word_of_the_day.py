@@ -19,7 +19,10 @@ from pathlib import Path
 import httpx
 
 CACHE_PATH    = Path.home() / ".cache" / "word_of_the_day.json"
+HISTORY_PATH  = Path.home() / ".cache" / "word_history.json"
 FALLBACK_PATH = Path(__file__).parent / "fallbacks.json"
+
+_HISTORY_MAX = 10
 
 _HARDCODED_FALLBACK = (
     ["Sommerfugl", "En sommerfugl flyver over blomsten."],
@@ -28,11 +31,41 @@ _HARDCODED_FALLBACK = (
 )
 
 
-def _random_fallback():
-    """Return a random entry from fallbacks.json, or the hardcoded one."""
+def get_history() -> list[str]:
+    """Return the list of recent Danish words (newest last), up to _HISTORY_MAX."""
+    try:
+        return json.loads(HISTORY_PATH.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+def _add_to_history(danish_word: str) -> None:
+    history = get_history()
+    # deduplicate: remove previous occurrence so word moves to tail
+    history = [w for w in history if w.lower() != danish_word.lower()]
+    history.append(danish_word)
+    history = history[-_HISTORY_MAX:]
+    try:
+        HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+        HISTORY_PATH.write_text(json.dumps(history, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _random_fallback(avoid_words: list[str] | None = None):
+    """Return a random entry from fallbacks.json, or the hardcoded one.
+
+    avoid_words: Danish words to exclude (case-insensitive).  If the pool
+    shrinks to zero after filtering, the avoid constraint is dropped.
+    """
     try:
         pool = json.loads(FALLBACK_PATH.read_text(encoding="utf-8"))
         if pool:
+            if avoid_words:
+                lower_avoid = {w.lower() for w in avoid_words}
+                filtered = [e for e in pool
+                            if e["danish_word"].lower() not in lower_avoid]
+                pool = filtered or pool  # never return nothing
             entry = random.choice(pool)
             return (
                 [entry["danish_word"],   entry["danish_sentence"]],
@@ -98,12 +131,13 @@ _MAX_RETRIES = 3
 _RETRY_DELAY = 4   # seconds between retries
 
 
-def _fetch_from_api(avoid_word: str | None = None) -> dict:
+def _fetch_from_api(avoid_words: list[str] | None = None) -> dict:
     api_key = os.environ["GEMINI_API_KEY"]
-    avoid_clause = (
-        f" Do NOT pick '{avoid_word}' — choose a different word entirely."
-        if avoid_word else ""
-    )
+    if avoid_words:
+        quoted = ", ".join(f"'{w}'" for w in avoid_words)
+        avoid_clause = f" Do NOT pick any of these words: {quoted} — choose a completely different word."
+    else:
+        avoid_clause = ""
     payload = {
         "contents": [
             {
@@ -154,11 +188,11 @@ def _fetch_from_api(avoid_word: str | None = None) -> dict:
     raise RuntimeError(f"All models failed after {_MAX_RETRIES} attempts each")
 
 
-def get_word(avoid_word: str | None = None):
+def get_word(avoid_words: list[str] | None = None):
     """Return ([danish_word, danish_sentence], [english_word, english_sentence],
                [romanian_word, romanian_sentence]).
 
-    avoid_word: hint to the API to pick something other than this Danish word.
+    avoid_words: list of Danish words to exclude (passed to API + fallback picker).
     """
     today = date.today().isoformat()
     cache = _load_cache()
@@ -173,10 +207,10 @@ def get_word(avoid_word: str | None = None):
         )
 
     try:
-        word = _fetch_from_api(avoid_word=avoid_word)
+        word = _fetch_from_api(avoid_words=avoid_words)
     except Exception:
         # Cache the fallback so A, B, C all show the same word today
-        fallback = _random_fallback()
+        fallback = _random_fallback(avoid_words=avoid_words)
         try:
             cache[today] = {
                 "danish_word":      fallback[0][0], "danish_sentence":  fallback[0][1],
@@ -186,6 +220,7 @@ def get_word(avoid_word: str | None = None):
             _save_cache(cache)
         except Exception:
             pass
+        _add_to_history(fallback[0][0])
         return fallback
 
     try:
@@ -193,6 +228,7 @@ def get_word(avoid_word: str | None = None):
         _save_cache(cache)
     except Exception:
         pass
+    _add_to_history(word["danish_word"])
 
     return (
         [word["danish_word"],   word["danish_sentence"]],

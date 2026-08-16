@@ -25,10 +25,10 @@ import sentence_display
 import romanian_display
 import refresh_display
 
-def _safe_fallback():
+def _safe_fallback(avoid_words=None):
     """Return a guaranteed-available prepared tuple (never triggers a network call)."""
     try:
-        return word_of_the_day.get_word.__module__ and word_of_the_day._random_fallback()
+        return word_of_the_day._random_fallback(avoid_words=avoid_words)
     except Exception:
         return (
             ["Sommerfugl", "En sommerfugl flyver over blomsten."],
@@ -124,9 +124,13 @@ def _run_refresh():
         buttonshim.set_pixel(255, 0, 255)
         # Push interstitial right away — gives user feedback during panel refresh
         refresh_display.show()
-        # Clear cache; pass the old word so the API picks something different
+        # Build avoid list: history (last 10) + today's word being replaced
+        history = word_of_the_day.get_history()
         old_word = word_of_the_day.clear_today()
-        prepared = word_of_the_day.get_word(avoid_word=old_word)
+        if old_word and (not history or history[-1].lower() != old_word.lower()):
+            history = history + [old_word]
+        avoid_words = history[-10:] if history else None
+        prepared = word_of_the_day.get_word(avoid_words=avoid_words)
         word_display.show(prepared)
         print("Done refresh", flush=True)
     except Exception:
